@@ -70,27 +70,35 @@ def parse_header(raw_hdr):
         warnings.warn('Unexpected start to header: ' + hdr_lines[0])
 
     # Try to read the original file path
-    try:
-        assert hdr_lines[1].split()[1:3] == ['File', 'Name']
-        hdr[u'FileName']  = ' '.join(hdr_lines[1].split()[3:])
-        # hdr['save_path'] = hdr['FileName']
-    except:
-        warnings.warn('Unable to parse original file path from Neuralynx header: ' + hdr_lines[1])
+    # try:
+    #     assert hdr_lines[1].split()[1:3] == ['File', 'Name']
+    #     hdr[u'FileName']  = ' '.join(hdr_lines[1].split()[3:])
+    #     # hdr['save_path'] = hdr['FileName']
+    # except:
+    #     warnings.warn('Unable to parse original file path from Neuralynx header: ' + hdr_lines[1])
 
     # Process lines with file opening and closing times
-    hdr[u'TimeOpened'] = hdr_lines[2][3:]
-    hdr[u'TimeOpened_dt'] = parse_neuralynx_time_string(hdr_lines[2])
-    hdr[u'TimeClosed'] = hdr_lines[3][3:]
-    hdr[u'TimeClosed_dt'] = parse_neuralynx_time_string(hdr_lines[3])
+    # hdr[u'TimeOpened'] = hdr_lines[2][3:]
+    # hdr[u'TimeOpened_dt'] = parse_neuralynx_time_string(hdr_lines[2])
+    # hdr[u'TimeClosed'] = hdr_lines[3][3:]
+    # hdr[u'TimeClosed_dt'] = parse_neuralynx_time_string(hdr_lines[3])
 
     # Read the parameters, assuming "-PARAM_NAME PARAM_VALUE" format
-    for line in hdr_lines[4:]:
-        try:
-            name, value = line[1:].split()  # Ignore the dash and split PARAM_NAME and PARAM_VALUE
+    for line in hdr_lines[1:]:
+        # try:
+        line = line.lstrip('-')
+        if ' ' not in line:
+            hdr[line] = None
+        else:
+            name, value = line.split(' ', 1)  # Ignore the dash and split PARAM_NAME and PARAM_VALUE
             hdr[name] = value
-        except:
-            warnings.warn('Unable to parse parameter line from Neuralynx header: ' + line)
-
+        # except:
+        #     warnings.warn('Unable to parse parameter line from Neuralynx header: ' + line)
+        #     raise
+    
+    hdr['TimeOpened_dt'] = parse_neuralynx_time_string(hdr['TimeCreated'])
+    hdr['TimeClosed_dt'] = parse_neuralynx_time_string(hdr['TimeClosed'])
+    
     return hdr
 
 
@@ -121,6 +129,9 @@ def estimate_record_count(file_path, record_dtype):
 
 
 def parse_neuralynx_time_string(time_string):
+    dt = datetime.datetime.strptime(time_string, '%Y/%m/%d %H:%M:%S')
+    return dt
+    
     # Parse a datetime object from the idiosyncratic time string in Neuralynx file headers
     try:
         tmp_date = [int(x) for x in time_string.split()[4].split('/')]
@@ -146,7 +157,10 @@ def check_ncs_records(records):
         warnings.warn('Sampling frequency changed during record sequence')
         return False
     elif not np.all(records['NumValidSamples'] == 512):
-        warnings.warn('Invalid samples in one or more records')
+        # print(records['NumValidSamples'])
+        only_last = np.all(records['NumValidSamples'][:-1] == 512)
+        # print(only_last)
+        # warnings.warn(f"Invalid samples in one or more records only_last = {only_last} {records['NumValidSamples']}")
         return False
     elif not np.all(dt <= 1):
         warnings.warn('Time stamp difference tolerance exceeded')
